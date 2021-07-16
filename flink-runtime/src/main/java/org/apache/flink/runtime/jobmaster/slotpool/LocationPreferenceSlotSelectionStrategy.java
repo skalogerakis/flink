@@ -24,6 +24,9 @@ import org.apache.flink.runtime.clusterframework.types.SlotProfile;
 import org.apache.flink.runtime.jobmanager.scheduler.Locality;
 import org.apache.flink.runtime.taskmanager.TaskManagerLocation;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nonnull;
 
 import java.util.Collection;
@@ -35,6 +38,8 @@ import java.util.Optional;
  * This class implements a {@link SlotSelectionStrategy} that is based on location preference hints.
  */
 public abstract class LocationPreferenceSlotSelectionStrategy implements SlotSelectionStrategy {
+    private static final Logger log =
+            LoggerFactory.getLogger(LocationPreferenceSlotSelectionStrategy.class);
 
     LocationPreferenceSlotSelectionStrategy() {}
 
@@ -71,6 +76,8 @@ public abstract class LocationPreferenceSlotSelectionStrategy implements SlotSel
         final Map<String, Integer> preferredFQHostNames = new HashMap<>(locationPreferences.size());
 
         for (TaskManagerLocation locationPreference : locationPreferences) {
+            log.info("LOCATION PREFERENCE GETRESOURCEID ", locationPreference.getResourceID());
+            log.info("LOCATION FQHOSTNAMES ", locationPreference.getResourceID());
             preferredResourceIDs.merge(locationPreference.getResourceID(), 1, Integer::sum);
             preferredFQHostNames.merge(locationPreference.getFQDNHostname(), 1, Integer::sum);
         }
@@ -108,6 +115,9 @@ public abstract class LocationPreferenceSlotSelectionStrategy implements SlotSel
                 }
             }
         }
+        log.info(
+                "SLOT INFO AND LOCALITY ",
+                SlotInfoAndLocality.of(bestCandidate.getSlotInfo(), bestCandidateLocality));
 
         // at the end of the iteration, we return the candidate with best possible locality or null.
         return bestCandidate != null

@@ -239,6 +239,17 @@ public class CheckpointingOptions {
                                     + "in a Flink supported filesystem. The storage path must be accessible from all participating processes/nodes"
                                     + "(i.e. all TaskManagers and JobManagers).");
 
+    // TODO ADD DESCRIPTION and change the existing
+    @Documentation.Section(value = Documentation.Sections.EXPERT_STATE_BACKENDS)
+    public static final ConfigOption<String> JOBMANAGER_LOCALITY =
+            ConfigOptions.key("jobmanager.locality")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The default directory used for storing the data files and meta data of checkpoints "
+                                    + "in a Flink supported filesystem. The storage path must be accessible from all participating processes/nodes"
+                                    + "(i.e. all TaskManagers and JobManagers).");
+
     /**
      * The minimum size of state data files. All state chunks smaller than that are stored inline in
      * the root checkpoint metadata file.

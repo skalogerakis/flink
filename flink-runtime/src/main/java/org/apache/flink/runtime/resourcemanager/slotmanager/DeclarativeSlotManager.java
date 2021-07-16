@@ -256,6 +256,7 @@ public class DeclarativeSlotManager implements SlotManager {
 
     @Override
     public void processResourceRequirements(ResourceRequirements resourceRequirements) {
+        LOG.info("YOOOOOOOO231123123");
         checkInit();
         if (resourceRequirements.getResourceRequirements().isEmpty()) {
             LOG.info("Clearing resource requirements of job {}", resourceRequirements.getJobId());
@@ -267,9 +268,17 @@ public class DeclarativeSlotManager implements SlotManager {
         }
 
         if (!resourceRequirements.getResourceRequirements().isEmpty()) {
+            LOG.info(
+                    "NOT EMPTY {}: {}",
+                    resourceRequirements.getJobId(),
+                    resourceRequirements.getTargetAddress());
             jobMasterTargetAddresses.put(
                     resourceRequirements.getJobId(), resourceRequirements.getTargetAddress());
         }
+        LOG.info(
+                "NOTIFY {}: {}",
+                resourceRequirements.getJobId(),
+                resourceRequirements.getResourceRequirements());
         resourceTracker.notifyResourceRequirements(
                 resourceRequirements.getJobId(), resourceRequirements.getResourceRequirements());
         checkResourceRequirements();
@@ -449,6 +458,8 @@ public class DeclarativeSlotManager implements SlotManager {
                 missingResources.entrySet()) {
             final JobID jobId = resourceRequirements.getKey();
 
+            LOG.info("MISSING RESOURCES {}", resourceRequirements.getKey());
+
             final ResourceCounter unfulfilledJobRequirements =
                     tryAllocateSlotsForJob(jobId, resourceRequirements.getValue());
             if (!unfulfilledJobRequirements.isEmpty()) {
@@ -511,16 +522,21 @@ public class DeclarativeSlotManager implements SlotManager {
         int numUnfulfilled = 0;
         for (int x = 0; x < resourceRequirement.getNumberOfRequiredSlots(); x++) {
 
+            LOG.info("NUMBER OF REQUIRED SLOTS {}", resourceRequirement.getNumberOfRequiredSlots());
+
             final Optional<TaskManagerSlotInformation> reservedSlot =
                     slotMatchingStrategy.findMatchingSlot(
                             requiredResource, freeSlots, this::getNumberRegisteredSlotsOf);
             if (reservedSlot.isPresent()) {
                 // we do not need to modify freeSlots because it is indirectly modified by the
                 // allocation
+                LOG.info("RESERVED SLOT IS PRESENT {}: {}", jobId, targetAddress);
+
                 allocateSlot(reservedSlot.get(), jobId, targetAddress, requiredResource);
             } else {
                 // exit loop early; we won't find a matching slot for this requirement
                 int numRemaining = resourceRequirement.getNumberOfRequiredSlots() - x;
+                LOG.info("NUM REMAINING {}", numRemaining);
                 numUnfulfilled += numRemaining;
                 break;
             }
@@ -543,13 +559,22 @@ public class DeclarativeSlotManager implements SlotManager {
             String targetAddress,
             ResourceProfile resourceProfile) {
         final SlotID slotId = taskManagerSlot.getSlotId();
-        LOG.debug(
+        //        LOG.debug(
+        //                "Starting allocation of slot {} for job {} with resource profile {}.",
+        //                slotId,
+        //                jobId,
+        //                resourceProfile);
+
+        LOG.info(
                 "Starting allocation of slot {} for job {} with resource profile {}.",
                 slotId,
                 jobId,
                 resourceProfile);
 
         final InstanceID instanceId = taskManagerSlot.getInstanceId();
+
+        LOG.info("INSTANCE ID TASK MANAGER {}.", instanceId);
+
         if (!taskExecutorManager.isTaskManagerRegistered(instanceId)) {
             throw new IllegalStateException(
                     "Could not find a registered task manager for instance id " + instanceId + '.');
