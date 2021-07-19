@@ -163,6 +163,7 @@ public enum AnyMatchingSlotMatchingStrategy implements SlotMatchingStrategy {
                                                     currIpPattern
                                                             .matcher(p.getSlotId().toString())
                                                             .find())
+                                    .filter(slot -> slot.isMatchingRequirement(requestedProfile))
                                     .findAny();
 
                     if (result.isPresent()) {
