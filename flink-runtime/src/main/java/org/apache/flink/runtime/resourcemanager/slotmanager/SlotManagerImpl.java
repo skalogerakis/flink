@@ -712,6 +712,7 @@ public class SlotManagerImpl implements SlotManager {
                         freeSlots.values(),
                         this::getNumberRegisteredSlotsOf);
 
+        LOG.info("SANITY CHECK FIND MATCHING SLOT");
         optionalMatchingSlot.ifPresent(
                 taskManagerSlot -> {
                     // sanity check
