@@ -181,16 +181,19 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
         logger.info(
                 "Starting to restore from state handle: {} without rescaling.", keyedStateHandle);
         if (keyedStateHandle instanceof IncrementalRemoteKeyedStateHandle) {
+            logger.info("INFO -> IncrementalRemoteKeyedStateHandle");
             IncrementalRemoteKeyedStateHandle incrementalRemoteKeyedStateHandle =
                     (IncrementalRemoteKeyedStateHandle) keyedStateHandle;
             restorePreviousIncrementalFilesStatus(incrementalRemoteKeyedStateHandle);
             restoreFromRemoteState(incrementalRemoteKeyedStateHandle);
         } else if (keyedStateHandle instanceof IncrementalLocalKeyedStateHandle) {
+            logger.info("INFO -> IncrementalLocalKeyedStateHandle");
             IncrementalLocalKeyedStateHandle incrementalLocalKeyedStateHandle =
                     (IncrementalLocalKeyedStateHandle) keyedStateHandle;
             restorePreviousIncrementalFilesStatus(incrementalLocalKeyedStateHandle);
             restoreFromLocalState(incrementalLocalKeyedStateHandle);
         } else {
+            logger.info("INFO -> STATE HANDLE ERROR");
             throw unexpectedStateHandleException(
                     new Class[] {
                         IncrementalRemoteKeyedStateHandle.class,
@@ -209,13 +212,20 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
                 localKeyedStateHandle.getCheckpointId(),
                 localKeyedStateHandle.getSharedStateHandleIDs());
         lastCompletedCheckpointId = localKeyedStateHandle.getCheckpointId();
+        logger.info(
+                "restorePreviousIncrementalFilesStatus {}, {}, {}",
+                backendUID.toString(),
+                lastCompletedCheckpointId,
+                localKeyedStateHandle.getSharedStateHandleIDs());
     }
 
     private void restoreFromRemoteState(IncrementalRemoteKeyedStateHandle stateHandle)
             throws Exception {
         // used as restore source for IncrementalRemoteKeyedStateHandle
+
         final Path tmpRestoreInstancePath =
                 instanceBasePath.getAbsoluteFile().toPath().resolve(UUID.randomUUID().toString());
+        logger.info("restoreFromRemoteState {}", tmpRestoreInstancePath.toString());
         try {
             restoreFromLocalState(
                     transferRemoteStateToLocalDirectory(tmpRestoreInstancePath, stateHandle));
@@ -226,6 +236,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
 
     private void restoreFromLocalState(IncrementalLocalKeyedStateHandle localKeyedStateHandle)
             throws Exception {
+
         KeyedBackendSerializationProxy<K> serializationProxy =
                 readMetaData(localKeyedStateHandle.getMetaDataState());
         List<StateMetaInfoSnapshot> stateMetaInfoSnapshots =
@@ -233,6 +244,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
 
         Path restoreSourcePath = localKeyedStateHandle.getDirectoryStateHandle().getDirectory();
 
+        logger.info("restoreFromLocalState {}", restoreSourcePath.toString());
         logger.debug(
                 "Restoring keyed backend uid in operator {} from incremental snapshot to {}.",
                 operatorIdentifier,
@@ -247,7 +259,7 @@ public class RocksDBIncrementalRestoreOperation<K> implements RocksDBRestoreOper
     private IncrementalLocalKeyedStateHandle transferRemoteStateToLocalDirectory(
             Path temporaryRestoreInstancePath, IncrementalRemoteKeyedStateHandle restoreStateHandle)
             throws Exception {
-
+        logger.info("transferRemoteStateToLocalDirectory");
         try (RocksDBStateDownloader rocksDBStateDownloader =
                 new RocksDBStateDownloader(numberOfTransferringThreads)) {
             rocksDBStateDownloader.transferAllStateDataToDirectory(
