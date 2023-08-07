@@ -23,6 +23,8 @@ import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.state.IncrementalRemoteKeyedStateHandle;
 import org.apache.flink.runtime.state.StateHandleID;
 import org.apache.flink.runtime.state.StreamStateHandle;
+import org.apache.flink.runtime.state.filesystem.FileStateHandle;
+import org.apache.flink.runtime.state.memory.ByteStreamStateHandle;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.function.ThrowingRunnable;
@@ -30,15 +32,22 @@ import org.apache.flink.util.function.ThrowingRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Help class for downloading RocksDB state files. */
 public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
@@ -169,18 +178,19 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
     //        }
     //
     //    }
+
     /** Copies the file from a single state handle to the given path. */
-    private void downloadDataForStateHandle(
+    private void downloadDataForStateHandle_LEGACY(
             Path restoreFilePath,
             StreamStateHandle remoteFileHandle,
             CloseableRegistry closeableRegistry)
             throws IOException {
 
-        //
-        // /tmp/flink-io-c336f5c9-07d9-4989-bac1-b97a15496815/job_aa022317926ec50f619ab032b8fa7bb9_op_KeyedProcessOperator_98c41c9645f181997ff11fa15e8b5c3e__1_1__uuid_6a5e469c-0ea7-4caa-abb4-a2e949718824/619b3492-0167-482e-8cf3-4410922d1f8d/000016.sst
         logger.info(
-                "downloadDataForStateHandle restore PATH -> {}",
-                restoreFilePath.toString()); // THIS IS THE FULL PATH CONTAINING THE .SST FILE NAME
+                "hdfsFile PATH -> {}, local -> {}",
+                remoteFileHandle.toString(),
+                restoreFilePath.toString()); // THIS IS THE FULL PATH CONTAINING THE .SST FILE
+
         FSDataInputStream inputStream = null;
         OutputStream outputStream = null;
 
@@ -210,5 +220,164 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 outputStream.close();
             }
         }
+    }
+
+    private void downloadDataForStateHandle(
+            Path restoreFilePath,
+            StreamStateHandle remoteFileHandle,
+            CloseableRegistry closeableRegistry)
+            throws IOException {
+
+        //        FSDataInputStream inputStream = null;
+        //        OutputStream outputStream = null;
+        //
+        //        closeableRegistry.registerCloseable(inputStream);
+        //        closeableRegistry.registerCloseable(outputStream);
+
+        logger.info(
+                "downloadDataForStateHandle restore PATH -> {}",
+                restoreFilePath.toString()); // THIS IS THE FULL PATH CONTAINING THE .SST FILE NAME
+
+        Files.createDirectories(Paths.get(restoreFilePath.toString()).getParent());
+
+        String hdfsFilePath = null;
+        // TODO this should be always true, maybe add a check
+        if (remoteFileHandle instanceof FileStateHandle) {
+            hdfsFilePath = ((FileStateHandle) remoteFileHandle).getFilePath().toString();
+            logger.info("is FileStateHandle -> {}", hdfsFilePath);
+
+        } else if (remoteFileHandle instanceof ByteStreamStateHandle) {
+            //            hdfsFilePath = ((ByteStreamStateHandle) remoteFileHandle).getHandleName();
+            logger.info("is ByteStreamStateHandle -> {}", hdfsFilePath);
+            downloadDataForStateHandle_LEGACY(restoreFilePath, remoteFileHandle, closeableRegistry);
+            return;
+        }
+
+        //        String hdfsFilePath = remoteFileHandle.getFilePath().toString(); // The HDFSpath
+        // to the file
+        String localOutputFilePath =
+                restoreFilePath.toString(); // The local path where the file will be moved
+
+        logger.info(
+                "hdfsFile PATH -> {}, local -> {}",
+                hdfsFilePath,
+                localOutputFilePath); // THIS IS THE FULL PATH CONTAINING THE .SST FILE NAME
+
+        // Init the cat cmd
+        List<String> concat_cmd =
+                new ArrayList<String>() {
+                    {
+                        add("cat");
+                    }
+                };
+
+        try {
+            /** * HDFS FSCK CMD ** */
+
+            // Build the hdfs info command to find all the blocks for a given file
+            String[] hdfsInfoCmd = {"hdfs", "fsck", hdfsFilePath, "-files", "-blocks"};
+            logger.info(Arrays.toString(hdfsInfoCmd));
+
+            ProcessBuilder hdfs_pb = new ProcessBuilder(hdfsInfoCmd);
+            Process hdfs_proc = hdfs_pb.start();
+
+            // Wait for the command to complete and check status
+            CommandExecutionStatus(hdfs_proc.waitFor(), 0);
+
+            // String regexPattern = ".* len=(\\d*) Live_repl=(\\d*).*";
+            // Regex that matches the desired input
+            String regexPattern = ".*(\\d+)\\. (BP-\\w.+).* len=(\\d*) Live_repl=(\\d*).*";
+            Pattern pattern = Pattern.compile(regexPattern);
+
+            BufferedReader hdfs_cmd_output =
+                    new BufferedReader(new InputStreamReader(hdfs_proc.getInputStream()));
+
+            // read the output from the command
+            String s = null;
+            while ((s = hdfs_cmd_output.readLine()) != null) {
+                if (s.startsWith("Status"))
+                    break; // We don't need extra information from that point on
+                // System.out.println(s);
+
+                Matcher matcher = pattern.matcher(s);
+
+                // When the pattern finds a match
+                if (matcher.find()) {
+
+                    // Your regex matched the line, take values from the regex groups
+                    // String block_num = matcher.group(1); //The number of the block
+                    String info_loc = matcher.group(2); // The information about location
+                    // System.out.println("Value 2: " + info_loc);
+
+                    String[] split_info = info_loc.split(":");
+                    String block_pool_id = split_info[0]; // Block Pool Id (used in path)
+                    String block_id = split_info[1]; // Specific Block
+
+                    String block_id_path = block_id.substring(0, block_id.lastIndexOf("_"));
+                    // System.out.println("Path Info "+ block_pool_id + " Value Info " +
+                    // block_id_path);
+
+                    /** * FIND CMD ** */
+                    // THIS is the goal command. However we don't seem to need *
+                    // find
+                    //
+                    //
+                    // /tmp/hadoop-fs-tmp/current/BP-798034145-127.0.0.1-1690967214498/current/finalized -name
+                    //     'blk_1073741832*'
+                    // String fin_path = "/tmp/hadoop-fs-tmp/current/" + path_info +
+                    // "/current/finalized -name '" + sub_block_info + "*'";
+                    String find_search_path =
+                            "/tmp/hadoop-fs-tmp/current/" + block_pool_id + "/current/finalized";
+
+                    String[] find_command = {"find", find_search_path, "-name", block_id_path};
+                    logger.info(Arrays.toString(find_command));
+                    // Execute the command
+
+                    ProcessBuilder find_pb = new ProcessBuilder(find_command);
+                    Process find_proc = find_pb.start();
+
+                    // Wait for the command to complete
+                    CommandExecutionStatus(find_proc.waitFor(), 1);
+
+                    BufferedReader find_cmd_output =
+                            new BufferedReader(new InputStreamReader(find_proc.getInputStream()));
+
+                    String line = null;
+                    // We are expecting to find one path only. In case no path Error
+                    if ((line = find_cmd_output.readLine()) != null) concat_cmd.add(line);
+                    else
+                        logger.error(
+                                "ERROR -> Could not find "
+                                        + find_search_path
+                                        + ", with BlockID: "
+                                        + block_id_path);
+
+                    //                        System.out.println("ERROR -> Could not find " +
+                    // find_search_path + ", with BlockID: " + block_id_path);
+
+                }
+            }
+
+            logger.info(Arrays.toString(concat_cmd.toArray()));
+            /** * CONCAT CMD ** */
+            // Finish with the concat process after finding all the blocks
+            ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
+            concat_pb.redirectOutput(ProcessBuilder.Redirect.to(new File(localOutputFilePath)));
+            Process concat_proc = concat_pb.start();
+
+            CommandExecutionStatus(concat_proc.waitFor(), 3);
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void CommandExecutionStatus(int exitCode, int mode) {
+        if (exitCode != 0) logger.error("Failed. Exit code: " + exitCode + ", mode: " + mode);
+        //        if (exitCode == 0) {
+        //            System.out.println("Success");
+        //        } else {
+        //            System.err.println("Failed. Exit code: " + exitCode);
+        //        }
     }
 }
