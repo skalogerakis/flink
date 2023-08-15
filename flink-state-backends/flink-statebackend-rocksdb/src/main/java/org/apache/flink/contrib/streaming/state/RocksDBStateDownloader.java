@@ -41,7 +41,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -276,13 +275,13 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
             // Build the hdfs info command to find all the blocks for a given file
             String[] hdfsInfoCmd = {"hdfs", "fsck", hdfsFilePath, "-files", "-blocks"};
-            logger.info(Arrays.toString(hdfsInfoCmd));
+            // logger.info(Arrays.toString(hdfsInfoCmd));
 
             ProcessBuilder hdfs_pb = new ProcessBuilder(hdfsInfoCmd);
             Process hdfs_proc = hdfs_pb.start();
 
             // Wait for the command to complete and check status
-            CommandExecutionStatus(hdfs_proc.waitFor(), 0);
+            // CommandExecutionStatus(hdfs_proc.waitFor(), 0);
 
             // String regexPattern = ".* len=(\\d*) Live_repl=(\\d*).*";
             // Regex that matches the desired input
@@ -330,7 +329,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                             "/tmp/hadoop-fs-tmp/current/" + block_pool_id + "/current/finalized";
 
                     String[] find_command = {"find", find_search_path, "-name", block_id_path};
-                    logger.info(Arrays.toString(find_command));
+                    // logger.info(Arrays.toString(find_command));
                     // Execute the command
 
                     ProcessBuilder find_pb = new ProcessBuilder(find_command);
@@ -358,14 +357,14 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 }
             }
 
-            logger.info(Arrays.toString(concat_cmd.toArray()));
+            // logger.info(Arrays.toString(concat_cmd.toArray()));
             /** * CONCAT CMD ** */
             // Finish with the concat process after finding all the blocks
             ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
             concat_pb.redirectOutput(ProcessBuilder.Redirect.to(new File(localOutputFilePath)));
             Process concat_proc = concat_pb.start();
 
-            CommandExecutionStatus(concat_proc.waitFor(), 3);
+            // CommandExecutionStatus(concat_proc.waitFor(), 3);
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -374,10 +373,5 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
     public void CommandExecutionStatus(int exitCode, int mode) {
         if (exitCode != 0) logger.error("Failed. Exit code: " + exitCode + ", mode: " + mode);
-        //        if (exitCode == 0) {
-        //            System.out.println("Success");
-        //        } else {
-        //            System.err.println("Failed. Exit code: " + exitCode);
-        //        }
     }
 }
