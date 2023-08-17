@@ -65,11 +65,13 @@ public class AnyMatchingSlotMatchingStrategyTest extends TestLogger {
 
     @Test
     public void findMatchingSlot_withFulfillableRequest_returnsFulfillingSlot() {
+        // SK_EDIT
         final Optional<TestingTaskManagerSlotInformation> optionalMatchingSlot =
                 AnyMatchingSlotMatchingStrategy.INSTANCE.findMatchingSlot(
                         largeTaskManagerSlotInformation.getResourceProfile(),
                         freeSlots,
-                        countSlotsPerInstance(freeSlots));
+                        countSlotsPerInstance(freeSlots),
+                        null);
 
         assertTrue(optionalMatchingSlot.isPresent());
         assertThat(
@@ -79,11 +81,13 @@ public class AnyMatchingSlotMatchingStrategyTest extends TestLogger {
 
     @Test
     public void findMatchingSlot_withUnfulfillableRequest_returnsEmptyResult() {
+        // SK_EDIT
         final Optional<TestingTaskManagerSlotInformation> optionalMatchingSlot =
                 AnyMatchingSlotMatchingStrategy.INSTANCE.findMatchingSlot(
                         ResourceProfile.fromResources(Double.MAX_VALUE, Integer.MAX_VALUE),
                         freeSlots,
-                        countSlotsPerInstance(freeSlots));
+                        countSlotsPerInstance(freeSlots),
+                        null);
 
         assertFalse(optionalMatchingSlot.isPresent());
     }

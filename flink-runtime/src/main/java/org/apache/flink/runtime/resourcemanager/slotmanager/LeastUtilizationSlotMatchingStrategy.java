@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.instance.InstanceID;
 import org.apache.flink.util.Preconditions;
@@ -40,7 +41,8 @@ public enum LeastUtilizationSlotMatchingStrategy implements SlotMatchingStrategy
     public <T extends TaskManagerSlotInformation> Optional<T> findMatchingSlot(
             ResourceProfile requestedProfile,
             Collection<T> freeSlots,
-            Function<InstanceID, Integer> numberRegisteredSlotsLookup) {
+            Function<InstanceID, Integer> numberRegisteredSlotsLookup,
+            JobID jobID) {
         final Map<InstanceID, Integer> numSlotsPerTaskExecutor =
                 freeSlots.stream()
                         .collect(

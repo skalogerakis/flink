@@ -69,7 +69,8 @@ public class LeastUtilizationSlotMatchingStrategyTest extends TestLogger {
                 LeastUtilizationSlotMatchingStrategy.INSTANCE.findMatchingSlot(
                         requestedResourceProfile,
                         freeSlots,
-                        createRegisteredSlotsLookupFunction(registeredSlotPerTaskExecutor));
+                        createRegisteredSlotsLookupFunction(registeredSlotPerTaskExecutor),
+                        null);
 
         assertTrue(matchingSlot.isPresent());
         assertThat(matchingSlot.get().getSlotId(), is(leastUtilizedSlot.getSlotId()));

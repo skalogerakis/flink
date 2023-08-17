@@ -70,7 +70,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             CloseableRegistry closeableRegistry)
             throws Exception {
 
-        logger.info("transferAllStateDataToDirectory");
+        // logger.info("transferAllStateDataToDirectory");
         final Map<StateHandleID, StreamStateHandle> sstFiles = restoreStateHandle.getSharedState();
         final Map<StateHandleID, StreamStateHandle> miscFiles =
                 restoreStateHandle.getPrivateState();
@@ -113,20 +113,23 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             Path restoreInstancePath,
             CloseableRegistry closeableRegistry) {
         // THIS IS THE FULL PATH (NO SST)
-        logger.info("createDownloadRunnables {}", restoreInstancePath.toString());
+        // logger.info("createDownloadRunnables {}", restoreInstancePath.toString());
+
         List<Runnable> runnables = new ArrayList<>(stateHandleMap.size());
         for (Map.Entry<StateHandleID, StreamStateHandle> entry : stateHandleMap.entrySet()) {
             StateHandleID stateHandleID = entry.getKey();
             StreamStateHandle remoteFileHandle = entry.getValue();
-            logger.info(
-                    "stateHandleID -> {}, remoteFileHandle -> {}",
-                    stateHandleID
-                            .toString(), // STATE HANDLE WILL BE THE SST FILE NAME -> 000016.sst
-                    remoteFileHandle.toString()); // THIS HAS THE FULL HASHED FILE HDFS PATH ->
+            //            logger.info(
+            //                    "stateHandleID -> {}, remoteFileHandle -> {}",
+            //                    stateHandleID
+            //                            .toString(), // STATE HANDLE WILL BE THE SST FILE NAME ->
+            // 000016.sst
+            //                    remoteFileHandle.toString()); // THIS HAS THE FULL HASHED FILE
+            // HDFS PATH ->
             // hdfs:/flink-checkpoints/aa022317926ec50f619ab032b8fa7bb9/shared/fc61fd22-9864-4d4e-82c3-be40df310e5f
 
             Path path = restoreInstancePath.resolve(stateHandleID.toString());
-            logger.info("createDownloadRunnables PATH -> {}", path.toString());
+            // logger.info("createDownloadRunnables PATH -> {}", path.toString());
 
             // THIS IS THE FULL DESTINATION PATH CONTAINING THE .SST FILE NAME
 
@@ -139,56 +142,20 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         return runnables;
     }
 
-    //    private void downloadDataForStateHandle(
-    //            Path restoreFilePath,
-    //            StreamStateHandle remoteFileHandle,
-    //            CloseableRegistry closeableRegistry)
-    //            throws IOException {
-    //
-    //        logger.info("downloadDataForStateHandle restore PATH -> {}",
-    // restoreFilePath.toString());
-    //        //        FSDataInputStream inputStream = null;
-    //        //        OutputStream outputStream = null;
-    //
-    //        Files.createDirectories(restoreFilePath.getParent());
-    //        String hdfsFilePath = remoteFileHandle.toString(); // The HDFS path to the file
-    //        String localOutputFilePath =
-    //                restoreFilePath.toString(); // The local path where the file will be moved
-    //
-    //        try {
-    //            // Build the command to execute
-    //            String command = "hdfs dfs -get " + hdfsFilePath + " " + localOutputFilePath;
-    //
-    //            // Execute the command
-    //            Process process = Runtime.getRuntime().exec(command);
-    //
-    //            // Wait for the command to complete
-    //            int exitCode = process.waitFor();
-    //
-    //            if (exitCode == 0) {
-    //                System.out.println("File contents moved from HDFS to local file.");
-    //            } else {
-    //                System.err.println(
-    //                        "Failed to move file contents from HDFS to local file. Exit code: "
-    //                                + exitCode);
-    //            }
-    //        } catch (IOException | InterruptedException e) {
-    //            e.printStackTrace();
-    //        }
-    //
-    //    }
-
-    /** Copies the file from a single state handle to the given path. */
+    /**
+     * Copies the file from a single state handle to the given path. NOTE: This is the old version
+     * of the implementation. In case you wish to roll back to old version rename
+     * downloadDataForStateHandle_LEGACY to downloadDataForStateHandle
+     */
     private void downloadDataForStateHandle_LEGACY(
             Path restoreFilePath,
             StreamStateHandle remoteFileHandle,
             CloseableRegistry closeableRegistry)
             throws IOException {
 
-        logger.info(
-                "hdfsFile PATH -> {}, local -> {}",
-                remoteFileHandle.toString(),
-                restoreFilePath.toString()); // THIS IS THE FULL PATH CONTAINING THE .SST FILE
+        // THIS IS THE FULL PATH CONTAINING THE .SST FILE
+        // logger.info("hdfsFile PATH -> {}, local -> {}", remoteFileHandle.toString(),
+        // restoreFilePath.toString());
 
         FSDataInputStream inputStream = null;
         OutputStream outputStream = null;
@@ -226,41 +193,38 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             StreamStateHandle remoteFileHandle,
             CloseableRegistry closeableRegistry)
             throws IOException {
+        /*
+           restoreFilePath.toString() -> FULL PATH CONTAINING THE .SST FILE
+           remoteFileHandle.getFilePath().toString() -> The HDFS path to the file
+        */
 
-        //        FSDataInputStream inputStream = null;
-        //        OutputStream outputStream = null;
-        //
-        //        closeableRegistry.registerCloseable(inputStream);
-        //        closeableRegistry.registerCloseable(outputStream);
+        // logger.info("downloadDataForStateHandle restore PATH -> {}",
+        // restoreFilePath.toString());
 
-        logger.info(
-                "downloadDataForStateHandle restore PATH -> {}",
-                restoreFilePath.toString()); // THIS IS THE FULL PATH CONTAINING THE .SST FILE NAME
+        String localOutputFilePath =
+                restoreFilePath.toString(); // The local path where the file will be moved
 
-        Files.createDirectories(Paths.get(restoreFilePath.toString()).getParent());
+        // Create all the subdirectories that don't already exist in the local FS
+        Files.createDirectories(Paths.get(localOutputFilePath).getParent());
 
         String hdfsFilePath = null;
-        // TODO this should be always true, maybe add a check
+
+        /*
+           remoteFileHandle categories -> FileState & ByteStreamStateHandle
+           FileState -> Actual file and can perform the new logic with local copy
+           ByteStreamStateHandle -> Not actual files seems to be state stored in memory,
+           so use the old method
+        */
         if (remoteFileHandle instanceof FileStateHandle) {
             hdfsFilePath = ((FileStateHandle) remoteFileHandle).getFilePath().toString();
-            logger.info("is FileStateHandle -> {}", hdfsFilePath);
-
+            // logger.info("is FileStateHandle -> {}", hdfsFilePath);
         } else if (remoteFileHandle instanceof ByteStreamStateHandle) {
-            //            hdfsFilePath = ((ByteStreamStateHandle) remoteFileHandle).getHandleName();
-            logger.info("is ByteStreamStateHandle -> {}", hdfsFilePath);
+            // logger.info("is ByteStreamStateHandle -> {}", hdfsFilePath);
             downloadDataForStateHandle_LEGACY(restoreFilePath, remoteFileHandle, closeableRegistry);
             return;
         }
 
-        //        String hdfsFilePath = remoteFileHandle.getFilePath().toString(); // The HDFSpath
-        // to the file
-        String localOutputFilePath =
-                restoreFilePath.toString(); // The local path where the file will be moved
-
-        logger.info(
-                "hdfsFile PATH -> {}, local -> {}",
-                hdfsFilePath,
-                localOutputFilePath); // THIS IS THE FULL PATH CONTAINING THE .SST FILE NAME
+        // logger.info("hdfsFile PATH -> {}, local -> {}", hdfsFilePath, localOutputFilePath);
 
         // Init the cat cmd
         List<String> concat_cmd =
@@ -275,7 +239,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
             // Build the hdfs info command to find all the blocks for a given file
             String[] hdfsInfoCmd = {"hdfs", "fsck", hdfsFilePath, "-files", "-blocks"};
-            // logger.info(Arrays.toString(hdfsInfoCmd));
 
             ProcessBuilder hdfs_pb = new ProcessBuilder(hdfsInfoCmd);
             Process hdfs_proc = hdfs_pb.start();
@@ -283,7 +246,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             // Wait for the command to complete and check status
             // CommandExecutionStatus(hdfs_proc.waitFor(), 0);
 
-            // String regexPattern = ".* len=(\\d*) Live_repl=(\\d*).*";
             // Regex that matches the desired input
             String regexPattern = ".*(\\d+)\\. (BP-\\w.+).* len=(\\d*) Live_repl=(\\d*).*";
             Pattern pattern = Pattern.compile(regexPattern);
@@ -292,13 +254,14 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                     new BufferedReader(new InputStreamReader(hdfs_proc.getInputStream()));
 
             // read the output from the command
-            String s = null;
-            while ((s = hdfs_cmd_output.readLine()) != null) {
-                if (s.startsWith("Status"))
-                    break; // We don't need extra information from that point on
-                // System.out.println(s);
+            String out;
 
-                Matcher matcher = pattern.matcher(s);
+            while ((out = hdfs_cmd_output.readLine()) != null) {
+
+                if (out.startsWith("Status"))
+                    break; // We don't need extra information from that point on
+
+                Matcher matcher = pattern.matcher(out);
 
                 // When the pattern finds a match
                 if (matcher.find()) {
@@ -319,8 +282,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                     /** * FIND CMD ** */
                     // THIS is the goal command. However we don't seem to need *
                     // find
-                    //
-                    //
                     // /tmp/hadoop-fs-tmp/current/BP-798034145-127.0.0.1-1690967214498/current/finalized -name
                     //     'blk_1073741832*'
                     // String fin_path = "/tmp/hadoop-fs-tmp/current/" + path_info +
@@ -336,7 +297,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                     Process find_proc = find_pb.start();
 
                     // Wait for the command to complete
-                    CommandExecutionStatus(find_proc.waitFor(), 1);
+                    // CommandExecutionStatus(find_proc.waitFor(), 1);
 
                     BufferedReader find_cmd_output =
                             new BufferedReader(new InputStreamReader(find_proc.getInputStream()));
@@ -350,14 +311,9 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                                         + find_search_path
                                         + ", with BlockID: "
                                         + block_id_path);
-
-                    //                        System.out.println("ERROR -> Could not find " +
-                    // find_search_path + ", with BlockID: " + block_id_path);
-
                 }
             }
 
-            // logger.info(Arrays.toString(concat_cmd.toArray()));
             /** * CONCAT CMD ** */
             // Finish with the concat process after finding all the blocks
             ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
@@ -366,7 +322,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
             // CommandExecutionStatus(concat_proc.waitFor(), 3);
 
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

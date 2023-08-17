@@ -710,7 +710,8 @@ public class SlotManagerImpl implements SlotManager {
                 slotMatchingStrategy.findMatchingSlot(
                         requestResourceProfile,
                         freeSlots.values(),
-                        this::getNumberRegisteredSlotsOf);
+                        this::getNumberRegisteredSlotsOf,
+                        null);
 
         LOG.info("SANITY CHECK FIND MATCHING SLOT");
         optionalMatchingSlot.ifPresent(

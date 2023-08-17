@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.resourcemanager.slotmanager;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.instance.InstanceID;
 
@@ -37,8 +38,15 @@ public interface SlotMatchingStrategy {
      * @param numberRegisteredSlotsLookup lookup for the number of registered slots
      * @return Returns a matching slots or {@link Optional#empty()} if there is none
      */
+    //    <T extends TaskManagerSlotInformation> Optional<T> findMatchingSlot(
+    //            ResourceProfile requestedProfile,
+    //            Collection<T> freeSlots,
+    //            Function<InstanceID, Integer> numberRegisteredSlotsLookup);
+
+    // SK EDIT
     <T extends TaskManagerSlotInformation> Optional<T> findMatchingSlot(
             ResourceProfile requestedProfile,
             Collection<T> freeSlots,
-            Function<InstanceID, Integer> numberRegisteredSlotsLookup);
+            Function<InstanceID, Integer> numberRegisteredSlotsLookup,
+            JobID jobID);
 }
