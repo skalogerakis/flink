@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -51,6 +50,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Help class for downloading RocksDB state files. */
 public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
@@ -78,7 +78,7 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         final Map<StateHandleID, StreamStateHandle> miscFiles =
                 restoreStateHandle.getPrivateState();
 
-        int newPolicyFlag = 1;
+        int newPolicyFlag = 0;
         HashMap<String, HashMap<String, String>> hdfsPathBlockRegistry =
                 new HashMap<String, HashMap<String, String>>();
 
@@ -458,12 +458,23 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         // remoteFileHandle).getFilePath().toString();
 
         // Init the cat cmd
-        List<String> concat_cmd =
+        //        List<String> concat_cmd =
+        //                new ArrayList<String>() {
+        //                    {
+        //                        add("cat");
+        //                    }
+        //                };
+
+        // Init the ln cmd
+        List<String> ln_cmd =
                 new ArrayList<String>() {
                     {
-                        add("cat");
+                        add("ln");
+                        add("-s");
                     }
                 };
+
+        // List<String> custom_java_cmd = new ArrayList<String>() {};
 
         try {
             /** * FIND CMD ** */
@@ -478,19 +489,62 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 String block_pool_id = entry.getValue();
 
                 String find_search_path =
-                        "/tmp/hadoop-fs-tmp/current/" + block_pool_id + "/current/finalized";
+                        "/media/localdisk/skalogerakis/tmp/hadoop-fs-tmp/current/"
+                                + block_pool_id
+                                + "/current/finalized";
 
-                String[] find_command = {"find", find_search_path, "-name", block_id_path};
+                //                String[] find_command = {"find", find_search_path, "-name",
+                // block_id_path};
+                //
+                //                // Execute the command
+                //                ProcessBuilder find_pb = new ProcessBuilder(find_command);
+                //                Process find_proc = find_pb.start();
+                //
+                //                // Wait for the command to complete
+                //                CommandExecutionStatus(find_proc.waitFor(), 1);
+                //
+                //                BufferedReader find_cmd_output =
+                //                        new BufferedReader(new
+                // InputStreamReader(find_proc.getInputStream()));
+                //
+                //                //                Instant end_time_find = Instant.now();
+                //                //                logger.info(
+                //                //                        "FIND "
+                //                //                                +
+                // Duration.between(start_time_upd,
+                //                // end_time_find).toMillis()
+                //                //                                + "\tFILE "
+                //                //                                + remoteFileHandle.toString());
+                //
+                //                String line = null;
+                //                // We are expecting to find one path only. In case no path Error
+                //                if ((line = find_cmd_output.readLine()) != null)
+                // concat_cmd.add(line);
+                //                else
+                //                    logger.error(
+                //                            "ERROR -> Could not find "
+                //                                    + find_search_path
+                //                                    + ", with BlockID: "
+                //                                    + block_id_path);
 
-                // Execute the command
-                ProcessBuilder find_pb = new ProcessBuilder(find_command);
-                Process find_proc = find_pb.start();
+                List<Path> foundFiles =
+                        Files.walk(Paths.get(find_search_path))
+                                // .filter(Files::isRegularFile)
+                                .filter(path -> path.getFileName().toString().equals(block_id_path))
+                                .collect(Collectors.toList());
 
-                // Wait for the command to complete
-                CommandExecutionStatus(find_proc.waitFor(), 1);
-
-                BufferedReader find_cmd_output =
-                        new BufferedReader(new InputStreamReader(find_proc.getInputStream()));
+                if (foundFiles.isEmpty()) {
+                    logger.error(
+                            "ERROR -> Could not find "
+                                    + find_search_path
+                                    + ", with BlockID: "
+                                    + block_id_path);
+                } else {
+                    // We are expecting to find one path only. In case no path Error
+                    //                    concat_cmd.add(foundFiles.get(0).toString());
+                    ln_cmd.add(foundFiles.get(0).toString());
+                    //                    custom_java_cmd.add(foundFiles.get(0).toString());
+                }
 
                 //                Instant end_time_find = Instant.now();
                 //                logger.info(
@@ -499,23 +553,46 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 // end_time_find).toMillis()
                 //                                + "\tFILE "
                 //                                + remoteFileHandle.toString());
-
-                String line = null;
-                // We are expecting to find one path only. In case no path Error
-                if ((line = find_cmd_output.readLine()) != null) concat_cmd.add(line);
-                else
-                    logger.error(
-                            "ERROR -> Could not find "
-                                    + find_search_path
-                                    + ", with BlockID: "
-                                    + block_id_path);
             }
 
             /** * CONCAT CMD ** */
             // Finish with the concat process after finding all the blocks
-            ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
-            concat_pb.redirectOutput(ProcessBuilder.Redirect.to(new File(localOutputFilePath)));
+            //            ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
+            //            concat_pb.redirectOutput(ProcessBuilder.Redirect.to(new
+            // File(localOutputFilePath)));
+            //            Process concat_proc = concat_pb.start();
+
+            /** * LN CMD ** */
+            ln_cmd.add(localOutputFilePath);
+
+            // Finish with the concat process after finding all the blocks
+            ProcessBuilder concat_pb = new ProcessBuilder(ln_cmd);
             Process concat_proc = concat_pb.start();
+
+            CommandExecutionStatus(concat_proc.waitFor(), 3);
+            concat_proc.destroy();
+
+            //            ProcessBuilder cache_pb = new ProcessBuilder("echo 3 >
+            // /proc/sys/vm/drop_caches");
+            //            Process cache_proc = cache_pb.start();
+            //            CommandExecutionStatus(cache_proc.waitFor(), 4);
+            //            cache_proc.destroy();
+
+            /** * Custom Java Cmd ** */
+            //            try (FileOutputStream fos = new FileOutputStream(localOutputFilePath)) {
+            //                for (String inputFile : custom_java_cmd) {
+            //                    try (FileInputStream fis = new FileInputStream(inputFile)) {
+            //                        byte[] buffer = new byte[8 * 1024];
+            //                        int bytesRead;
+            //                        while ((bytesRead = fis.read(buffer)) != -1) {
+            //                            fos.write(buffer, 0, bytesRead);
+            //                        }
+            //                    }
+            //                }
+            //
+            //            } catch (IOException e) {
+            //                e.printStackTrace();
+            //            }
 
             //            Instant end_time_cat = Instant.now();
             //            logger.info(
@@ -525,14 +602,14 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             //                            + "\tFILE "
             //                            + remoteFileHandle.toString());
 
-            CommandExecutionStatus(concat_proc.waitFor(), 3);
-
             Instant end_time_upd = Instant.now();
             logger.info(
                     "CAT + FIND Duration "
                             + Duration.between(start_time_upd, end_time_upd).toMillis()
                             + "\tFILE "
-                            + remoteFileHandle.toString());
+                            + remoteFileHandle.toString()
+                            + "\t BLOCKS "
+                            + hdfsFullFileInfo.size());
 
         } catch (IOException e) {
             e.printStackTrace();
