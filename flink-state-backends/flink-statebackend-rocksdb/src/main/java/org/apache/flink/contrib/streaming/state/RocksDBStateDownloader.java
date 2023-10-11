@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -458,21 +459,21 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
         // remoteFileHandle).getFilePath().toString();
 
         // Init the cat cmd
-        //        List<String> concat_cmd =
-        //                new ArrayList<String>() {
-        //                    {
-        //                        add("cat");
-        //                    }
-        //                };
-
-        // Init the ln cmd
-        List<String> ln_cmd =
+        List<String> concat_cmd =
                 new ArrayList<String>() {
                     {
-                        add("ln");
-                        add("-s");
+                        add("cat");
                     }
                 };
+
+        // Init the ln cmd
+        //        List<String> ln_cmd =
+        //                new ArrayList<String>() {
+        //                    {
+        //                        add("ln");
+        //                        add("-s");
+        //                    }
+        //                };
 
         // List<String> custom_java_cmd = new ArrayList<String>() {};
 
@@ -541,8 +542,8 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                                     + block_id_path);
                 } else {
                     // We are expecting to find one path only. In case no path Error
-                    //                    concat_cmd.add(foundFiles.get(0).toString());
-                    ln_cmd.add(foundFiles.get(0).toString());
+                    concat_cmd.add(foundFiles.get(0).toString());
+                    //                    ln_cmd.add(foundFiles.get(0).toString());
                     //                    custom_java_cmd.add(foundFiles.get(0).toString());
                 }
 
@@ -557,17 +558,16 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
             /** * CONCAT CMD ** */
             // Finish with the concat process after finding all the blocks
-            //            ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
-            //            concat_pb.redirectOutput(ProcessBuilder.Redirect.to(new
-            // File(localOutputFilePath)));
-            //            Process concat_proc = concat_pb.start();
+            ProcessBuilder concat_pb = new ProcessBuilder(concat_cmd);
+            concat_pb.redirectOutput(ProcessBuilder.Redirect.to(new File(localOutputFilePath)));
+            Process concat_proc = concat_pb.start();
 
             /** * LN CMD ** */
-            ln_cmd.add(localOutputFilePath);
-
-            // Finish with the concat process after finding all the blocks
-            ProcessBuilder concat_pb = new ProcessBuilder(ln_cmd);
-            Process concat_proc = concat_pb.start();
+            //            ln_cmd.add(localOutputFilePath);
+            //
+            //            // Finish with the concat process after finding all the blocks
+            //            ProcessBuilder concat_pb = new ProcessBuilder(ln_cmd);
+            //            Process concat_proc = concat_pb.start();
 
             CommandExecutionStatus(concat_proc.waitFor(), 3);
             concat_proc.destroy();
