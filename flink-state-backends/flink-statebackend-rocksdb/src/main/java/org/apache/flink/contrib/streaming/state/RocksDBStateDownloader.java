@@ -255,7 +255,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
                 path.toString() -> Full path with .sst
                  */
 
-
                 String hdfsFilePath = ((FileStateHandle) remoteFileHandle).getFilePath().toString();
 
                 runnables.add(
@@ -393,8 +392,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
 
         try {
             /** * FIND CMD ** */
-
-
             for (Map.Entry<String, String> entry : hdfsFullFileInfo.entrySet()) {
                 String block_id_path = entry.getKey();
                 String block_pool_id = entry.getValue();
@@ -493,7 +490,6 @@ public class RocksDBStateDownloader extends RocksDBStateDataTransfer {
             throw new RuntimeException(e);
         }
     }
-
 
     public void CommandExecutionStatus(int exitCode, int mode) {
         if (exitCode != 0) logger.error("Failed. Exit code: " + exitCode + ", mode: " + mode);

@@ -1,0 +1,30 @@
+Connect to VPN & streamstore:
+ - openvpn3 session-start --config /etc/openvpn3/client.ovpn
+ - cssh -l skalogerakis -p 2222 139.91.183.36 139.91.183.74 139.91.183.133 139.91.183.66 139.91.183.87
+
+Build first the source code locally, branch sk-1.13.1
+ - Format the code using: mvn spotless:apply
+ - Build the version: mvn clean install -DskipTests -Dcheckstyle.skip -Drat.ignoreErrors=true -Dhadoop.version=3.2.2
+
+Copy from local directory to all streamstore servers:
+ - scp -P 2222 -r /home/skalogerakis/flink skalogerakis@139.91.183.66:/media/localdisk/skalogerakis/flink
+
+Modify configurations:
+ - Modify flink/bin/config.sh
+    - Change the default port on TMWorkers() functions and on ssh -p 2222
+ - Modify flink/conf/masters
+    - node01:8081 (Master IP)
+ - Modify flink/conf/workers
+    - Add all workers (node02, node03...)
+ - Modify flink/conf/flink-conf.yaml
+    - jobmanager.rpc.address: node01
+    - // taskmanager.memory.process.size: 1728m
+    - taskmanager.memory.flink.size: 20000m
+    - state.backend: rocksdb
+    -  state.backend.incremental: true
+    -  state.checkpoints.dir: hdfs:///flink_checkpoints # location to store checkpoints
+    -  state.backend.rocksdb.localdir: /media/localdisk/skalogerakis/tmp/rocksdb	#Store on SSD
+    -  io.tmp.dirs: /media/localdisk/skalogerakis/tmp/io	#Store on SSD
+
+
+
